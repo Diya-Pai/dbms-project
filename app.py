@@ -24,6 +24,7 @@ import random
 all_teachers = list(gen.faculties.keys())
 
 for section in sections:
+    daily_track = {day: 0 for day in DAYS}
     for sname, freq in theory_subjects:
         if sname == "Bio":
             tid = "T999"
@@ -35,7 +36,7 @@ for section in sections:
         gen.assign_subject(lname, lname, "Lab", 1, section, tid)
 
 # Generate the timetable
-gen.generate()
+gen.generate(force_fill_days=True)
 
 st.set_page_config(layout="wide")
 st.title("📅 Timetable Management App")
@@ -56,16 +57,16 @@ def display_timetable(tt, title):
 
 def color_map(subject):
     if not subject:
-        return "#f0f0f0"
+        return "#2e2e2e"
     key = subject.split()[0]
     color_dict = {
-        "ADA": "#F44336", "MC": "#4CAF50", "DBMS": "#2196F3", "Math": "#9C27B0",
-        "Bio": "#FF9800", "UHV": "#009688", "Lab": "#E91E63", "UI/UX": "#FFEB3B"
+        "ADA": "#EF9A9A", "MC": "#A5D6A7", "DBMS": "#90CAF9", "Math": "#CE93D8",
+        "Bio": "#FFCC80", "UHV": "#80CBC4", "Lab": "#F48FB1", "UI/UX": "#FFF59D"
     }
     for k, v in color_dict.items():
         if k in key:
             return v
-    return "#E0E0E0"
+    return "#B0BEC5"
 
 def convert_df_to_excel(df, name):
     output = BytesIO()
