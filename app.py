@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 
-# Generate timetable
+# Initialize and generate timetable
 gen = TimetableGenerator()
 gen.generate()
 
