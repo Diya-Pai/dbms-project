@@ -22,6 +22,7 @@ class TimetableGenerator:
         for tid, name, role, max_units in cursor.fetchall():
             self.teachers[tid] = {
                 'name': name,
+                'role': role,
                 'max_units': max_units,
                 'assigned_units': 0,
                 'schedule': {day: [None]*7 for day in DAYS}
@@ -77,7 +78,7 @@ class TimetableGenerator:
                     self.teachers[teacher_id]['assigned_units'] += (2 if is_lab else 1)
                     break
 
-    def generate(self, balance_workload=False, avoid_back_to_back=False, allow_subject_split=False):
+    def generate(self, balance_workload=True, avoid_back_to_back=False, allow_subject_split=False):
         random.shuffle(self.subjects)
         subject_groups = defaultdict(list)
         for s in self.subjects:
@@ -105,3 +106,6 @@ class TimetableGenerator:
 
     def get_teacher_timetable(self, teacher_id):
         return self.teachers[teacher_id]['schedule']
+
+    def get_teacher_workload(self):
+        return {tid: (t['name'], t['assigned_units'], t['max_units']) for tid, t in self.teachers.items()}
