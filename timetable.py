@@ -41,7 +41,6 @@ class TimetableGenerator:
         if is_lab:
             if slot >= len(TIME_SLOTS) - 1 or schedule[slot + 1] is not None:
                 return False
-        # Avoid isolated slots
         neighbors = []
         if slot > 0:
             neighbors.append(schedule[slot - 1])
@@ -56,11 +55,12 @@ class TimetableGenerator:
         is_lab = subject[4] == "lab"
         for i in range(sessions_needed):
             valid_slots = [(day, slot) for day in DAYS for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0))]
+            random.shuffle(valid_slots)
             valid_slots = sorted(
                 valid_slots,
                 key=lambda x: (
                     sum(slot is not None for slot in self.section_timetables[section][x[0]]),
-                    x[1]  # earlier time slots
+                    x[1]
                 )
             )
             for day, slot in valid_slots:
@@ -83,20 +83,21 @@ class TimetableGenerator:
         for s in self.subjects:
             subject_groups[s[1]].append(s)
 
-        teacher_pool = list(self.teachers.keys())
-        ti = 0
         for subj_list in subject_groups.values():
             for subject in subj_list:
                 assigned = False
                 retries = 0
-                while not assigned and retries < len(teacher_pool):
-                    teacher_id = teacher_pool[ti % len(teacher_pool)]
+                sorted_teachers = sorted(
+                    self.teachers.items(),
+                    key=lambda item: item[1]['assigned_units'] / item[1]['max_units'] if item[1]['max_units'] > 0 else 1
+                )
+                while not assigned and retries < len(sorted_teachers):
+                    teacher_id = sorted_teachers[retries][0]
                     teacher = self.teachers[teacher_id]
                     needed_units = (2 if subject[4] == 'lab' else 1) * subject[3]
                     if teacher['assigned_units'] + needed_units <= teacher['max_units']:
                         self.assign_class(subject[5], subject, teacher_id, subject[3])
                         assigned = True
-                    ti += 1
                     retries += 1
 
     def get_section_timetable(self, section):
