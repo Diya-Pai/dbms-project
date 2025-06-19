@@ -32,21 +32,26 @@ class TimetableGenerator:
 
         conn.close()
 
-    def can_assign(self, teacher_id, day, slot, is_lab):
-        teacher = self.teachers[teacher_id]
-        if teacher['schedule'][day][slot]:
-            return False
-        if is_lab:
-            if slot >= len(TIME_SLOTS) - 1:
-                return False
-            if teacher['schedule'][day][slot + 1]:
-                return False
-        else:
-            if slot > 0 and teacher['schedule'][day][slot - 1]:
-                return False
-            if slot < len(TIME_SLOTS) - 1 and teacher['schedule'][day][slot + 1]:
-                return False
-        return True
+   def can_assign(self, teacher_id, day, slot, is_lab):
+    teacher = self.teachers[teacher_id]
+    schedule = teacher['schedule'][day]
+
+    if schedule[slot] is not None:
+        return False
+    if is_lab and (slot >= len(TIME_SLOTS) - 1 or schedule[slot + 1]):
+        return False
+
+    # avoid isolated slots
+    neighbors = []
+    if slot > 0:
+        neighbors.append(schedule[slot - 1])
+    if slot < len(TIME_SLOTS) - 1:
+        neighbors.append(schedule[slot + 1])
+    if all(n is None for n in neighbors):
+        return False  # don't allow lonely slot unless necessary
+
+    return True
+
 
     def assign_class(self, section, subject, teacher_id, sessions_needed):
         is_lab = subject[4] == "lab"
