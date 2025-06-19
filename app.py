@@ -4,9 +4,9 @@ import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 import sqlite3
 
-# Initialize timetable generator
+# Initialize timetable generator with constraints
 gen = TimetableGenerator()
-gen.generate(balance_workload=True)
+gen.generate(balance_workload=True, avoid_back_to_back=True, allow_subject_split=True)
 
 # Load teachers list for selection
 conn = sqlite3.connect("timetable.db")
