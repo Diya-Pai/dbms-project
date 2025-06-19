@@ -32,32 +32,37 @@ class TimetableGenerator:
 
         conn.close()
 
-   def can_assign(self, teacher_id, day, slot, is_lab):
-    teacher = self.teachers[teacher_id]
-    schedule = teacher['schedule'][day]
+    def can_assign(self, teacher_id, day, slot, is_lab):
+        teacher = self.teachers[teacher_id]
+        schedule = teacher['schedule'][day]
 
-    if schedule[slot] is not None:
-        return False
-    if is_lab and (slot >= len(TIME_SLOTS) - 1 or schedule[slot + 1]):
-        return False
+        if schedule[slot] is not None:
+            return False
+        if is_lab:
+            if slot >= len(TIME_SLOTS) - 1 or schedule[slot + 1] is not None:
+                return False
+        # Avoid isolated slots
+        neighbors = []
+        if slot > 0:
+            neighbors.append(schedule[slot - 1])
+        if slot < len(TIME_SLOTS) - 1:
+            neighbors.append(schedule[slot + 1])
+        if all(n is None for n in neighbors):
+            return False
 
-    # avoid isolated slots
-    neighbors = []
-    if slot > 0:
-        neighbors.append(schedule[slot - 1])
-    if slot < len(TIME_SLOTS) - 1:
-        neighbors.append(schedule[slot + 1])
-    if all(n is None for n in neighbors):
-        return False  # don't allow lonely slot unless necessary
-
-    return True
-
+        return True
 
     def assign_class(self, section, subject, teacher_id, sessions_needed):
         is_lab = subject[4] == "lab"
         for i in range(sessions_needed):
             valid_slots = [(day, slot) for day in DAYS for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0))]
-            random.shuffle(valid_slots)
+            valid_slots = sorted(
+                valid_slots,
+                key=lambda x: (
+                    sum(slot is not None for slot in self.section_timetables[section][x[0]]),
+                    x[1]  # earlier time slots
+                )
+            )
             for day, slot in valid_slots:
                 if self.section_timetables[section][day][slot] is None and \
                    (not is_lab or self.section_timetables[section][day][slot + 1] is None) and \
