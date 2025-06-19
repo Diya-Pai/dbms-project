@@ -8,6 +8,19 @@ TIME_SLOTS = [
     "1:45-2:45", "2:45-3:45", "3:45-4:45"
 ]
 
+COLOR_MAP = {
+    "ADA": "#FFCCCC",
+    "MC": "#CCFFCC",
+    "DBMS": "#CCCCFF",
+    "Math": "#FFFFCC",
+    "Bio": "#FFCCFF",
+    "UHV": "#CCE5FF",
+    "ADA Lab": "#FF9999",
+    "MC Lab": "#99FF99",
+    "DBMS Lab": "#9999FF",
+    "UI/UX Lab": "#FFCC99"
+}
+
 class TimetableGenerator:
     def __init__(self):
         self.teachers = {}
@@ -49,10 +62,10 @@ class TimetableGenerator:
         ttable[tid][day][slot] = entry
 
     def generate(self):
+        # Sort subjects to prioritize those with more hours
+        self.subjects.sort(key=lambda s: -s['hr_per_week'])
         for subj in self.subjects:
-            options = list(self.teachers.keys())
-            random.shuffle(options)
-
+            options = sorted(self.teachers.keys(), key=lambda tid: self.teachers[tid]['assigned_units'])
             for tid in options:
                 teacher = self.teachers[tid]
                 if teacher['assigned_units'] + subj['hr_per_week'] <= teacher['max_units']:
@@ -65,26 +78,26 @@ class TimetableGenerator:
                                    self.is_available(self.section_timetable, subj['section'], day, i+1) and \
                                    self.is_available(self.teacher_timetable, tid, day, i) and \
                                    self.is_available(self.teacher_timetable, tid, day, i+1):
-
                                     label = f"{subj['sname']} Lab ({subj['section']})"
                                     self.assign(self.section_timetable, subj['section'], day, i, label)
                                     self.assign(self.section_timetable, subj['section'], day, i+1, label)
-
                                     self.assign(self.teacher_timetable, tid, day, i, label)
                                     self.assign(self.teacher_timetable, tid, day, i+1, label)
                                     teacher['assigned_units'] += 2
                                     slots_assigned += 2
                                     break
                         else:
-                            slot = random.randint(0, 6)
-                            if self.is_available(self.section_timetable, subj['section'], day, slot) and \
-                               self.is_available(self.teacher_timetable, tid, day, slot):
-
-                                label = f"{subj['sname']} ({subj['section']})"
-                                self.assign(self.section_timetable, subj['section'], day, slot, label)
-                                self.assign(self.teacher_timetable, tid, day, slot, label)
-                                teacher['assigned_units'] += 1
-                                slots_assigned += 1
+                            preferred_slots = [0, 1] if slots_assigned < 2 else list(range(7))
+                            random.shuffle(preferred_slots)
+                            for slot in preferred_slots:
+                                if self.is_available(self.section_timetable, subj['section'], day, slot) and \
+                                   self.is_available(self.teacher_timetable, tid, day, slot):
+                                    label = f"{subj['sname']} ({subj['section']})"
+                                    self.assign(self.section_timetable, subj['section'], day, slot, label)
+                                    self.assign(self.teacher_timetable, tid, day, slot, label)
+                                    teacher['assigned_units'] += 1
+                                    slots_assigned += 1
+                                    break
                     break
 
     def get_section_timetable(self, section):
@@ -95,3 +108,7 @@ class TimetableGenerator:
 
     def get_teacher_workload(self):
         return {tid: (info['name'], info['assigned_units'], info['max_units']) for tid, info in self.teachers.items()}
+
+    def get_color(self, subject_name):
+        base = subject_name.split()[0]
+        return COLOR_MAP.get(base, "#FFFFFF")
