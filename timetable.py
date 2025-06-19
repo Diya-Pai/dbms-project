@@ -21,6 +21,18 @@ UNIT_VALUE = {
     "Lab": 2
 }
 
+TEACHER_POOL = {
+    "HOD": ["Dr Thippeswamy G"],
+    "Cluster Head": ["Mahesh G"],
+    "Associate Professor": ["Dr Bharathi R", "Dr Nagabhushan S V", "Dr Ashwini N"],
+    "Assistant Professor": [
+        "Prof Jagadish P", "Dr Shankar Rajagopal", "Dr Dhanalakshmi B K",
+        "Prof Shilpa M", "Prof Goutami Chunumalla", "Dr Mohammed Khurram",
+        "Prof S Packiya Lekshmi", "Prof Arpitha Shivanna", "Prof Beerappa Belasakarge",
+        "Prof Chaitanya V", "Prof Aruna N", "Prof Anusha K L"
+    ]
+}
+
 class Faculty:
     def __init__(self, tid, name, role):
         self.tid = tid
@@ -48,6 +60,14 @@ class TimetableGenerator:
         self.subjects = []
         self.sections = {"A": {}, "B": {}, "C": {}}
         self.generated_tt = defaultdict(lambda: defaultdict(lambda: [None]*len(TIME_SLOTS)))
+        self._initialize_faculties()
+
+    def _initialize_faculties(self):
+        tid = 1
+        for role, names in TEACHER_POOL.items():
+            for name in names:
+                self.add_faculty(f"T{tid}", name, role)
+                tid += 1
 
     def add_faculty(self, tid, name, role):
         self.faculties[tid] = Faculty(tid, name, role)
