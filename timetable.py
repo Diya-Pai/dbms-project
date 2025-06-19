@@ -32,25 +32,39 @@ class TimetableGenerator:
 
         conn.close()
 
-    def can_assign(self, teacher_id, day, slot):
+    def can_assign(self, teacher_id, day, slot, is_lab):
         teacher = self.teachers[teacher_id]
         if teacher['schedule'][day][slot]:
             return False
-        if slot > 0 and teacher['schedule'][day][slot - 1]:
-            return False
-        if slot < len(TIME_SLOTS) - 1 and teacher['schedule'][day][slot + 1]:
-            return False
+        if is_lab:
+            if slot >= len(TIME_SLOTS) - 1:
+                return False
+            if teacher['schedule'][day][slot + 1]:
+                return False
+        else:
+            if slot > 0 and teacher['schedule'][day][slot - 1]:
+                return False
+            if slot < len(TIME_SLOTS) - 1 and teacher['schedule'][day][slot + 1]:
+                return False
         return True
 
     def assign_class(self, section, subject, teacher_id, sessions_needed):
+        is_lab = subject[4] == "lab"
         for day in DAYS:
-            for slot in range(len(TIME_SLOTS)):
+            for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0)):
                 if sessions_needed == 0:
                     return
-                if self.section_timetables[section][day][slot] is None and self.can_assign(teacher_id, day, slot):
-                    self.section_timetables[section][day][slot] = f"{subject[1]} ({self.teachers[teacher_id]['name']})"
+                if self.section_timetables[section][day][slot] is None and \
+                   (not is_lab or self.section_timetables[section][day][slot + 1] is None) and \
+                   self.can_assign(teacher_id, day, slot, is_lab):
+
+                    label = f"{subject[1]} ({self.teachers[teacher_id]['name']})"
+                    self.section_timetables[section][day][slot] = label
                     self.teachers[teacher_id]['schedule'][day][slot] = f"{subject[1]} ({section})"
-                    self.teachers[teacher_id]['assigned_units'] += 2 if subject[4] == "lab" else 1
+                    if is_lab:
+                        self.section_timetables[section][day][slot + 1] = label
+                        self.teachers[teacher_id]['schedule'][day][slot + 1] = f"{subject[1]} ({section})"
+                    self.teachers[teacher_id]['assigned_units'] += (2 if is_lab else 1)
                     sessions_needed -= 1
 
     def generate(self, balance_workload=False, avoid_back_to_back=False, allow_subject_split=False):
@@ -68,7 +82,8 @@ class TimetableGenerator:
                 while not assigned and retries < len(teacher_pool):
                     teacher_id = teacher_pool[ti % len(teacher_pool)]
                     teacher = self.teachers[teacher_id]
-                    if teacher['assigned_units'] + (2 if subject[4] == 'lab' else 1)*subject[3] <= teacher['max_units']:
+                    needed_units = (2 if subject[4] == 'lab' else 1) * subject[3]
+                    if teacher['assigned_units'] + needed_units <= teacher['max_units']:
                         self.assign_class(subject[5], subject, teacher_id, subject[3])
                         assigned = True
                     ti += 1
