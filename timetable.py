@@ -29,7 +29,7 @@ class TimetableGenerator:
                 "assigned_units": 0
             }
 
-        for row in c.execute("SELECT * FROM subjects"):
+        for row in c.execute("SELECT course_code, sname, credit, hr_per_week, type, section_name FROM subjects"):
             code, sname, credit, hrs, stype, section = row
             self.subjects.append({
                 "course_code": code,
