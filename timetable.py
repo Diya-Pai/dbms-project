@@ -1,137 +1,76 @@
 # timetable.py
+import sqlite3
 import random
-from collections import defaultdict
 
-# Constants
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 TIME_SLOTS = [
-    "8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50",
-    "1:45-2:45", "2:45-3:45", "3:45-4:45"
-]  # Skipping short break and lunch
-
-ROLE_UNITS = {
-    "HOD": 8,
-    "Cluster Head": 12,
-    "Associate Professor": 16,
-    "Assistant Professor": 24
-}
-
-UNIT_VALUE = {
-    "Theory": 2,
-    "Lab": 2
-}
-
-TEACHER_POOL = {
-    "HOD": ["Dr Thippeswamy G"],
-    "Cluster Head": ["Mahesh G"],
-    "Associate Professor": ["Dr Bharathi R", "Dr Nagabhushan S V", "Dr Ashwini N"],
-    "Assistant Professor": [
-        "Prof Jagadish P", "Dr Shankar Rajagopal", "Dr Dhanalakshmi B K",
-        "Prof Shilpa M", "Prof Goutami Chunumalla", "Dr Mohammed Khurram",
-        "Prof S Packiya Lekshmi", "Prof Arpitha Shivanna", "Prof Beerappa Belasakarge",
-        "Prof Chaitanya V", "Prof Aruna N", "Prof Anusha K L"
-    ]
-}
-
-class Faculty:
-    def __init__(self, tid, name, role):
-        self.tid = tid
-        self.name = name
-        self.role = role
-        self.max_units = ROLE_UNITS[role]
-        self.subjects = []
-        self.schedule = defaultdict(lambda: [None]*len(TIME_SLOTS))
-        self.units_allocated = 0
-
-    def can_teach(self, units):
-        return self.units_allocated + units <= self.max_units
-
-class Subject:
-    def __init__(self, code, name, type, hrs_per_week, section):
-        self.code = code
-        self.name = name
-        self.type = type
-        self.hrs_per_week = hrs_per_week
-        self.section = section
+    "8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50", "1:45-2:45", "2:45-3:45", "3:45-4:45"
+]
 
 class TimetableGenerator:
     def __init__(self):
-        self.faculties = {}
+        self.conn = sqlite3.connect("timetable.db")
+        self.cursor = self.conn.cursor()
+        self.sections = ["A", "B", "C"]
+        self.teachers = {}
         self.subjects = []
-        self.sections = {"A": {}, "B": {}, "C": {}}
-        self.generated_tt = defaultdict(lambda: defaultdict(lambda: [None]*len(TIME_SLOTS)))
-        self._initialize_faculties()
+        self.timetable = {}
 
-    def _initialize_faculties(self):
-        tid = 1
-        for role, names in TEACHER_POOL.items():
-            for name in names:
-                self.add_faculty(f"T{tid}", name, role)
-                tid += 1
+    def fetch_data(self):
+        self.cursor.execute("SELECT * FROM teachers")
+        for t_id, name, role, max_units in self.cursor.fetchall():
+            self.teachers[t_id] = {
+                "name": name,
+                "role": role,
+                "max_units": max_units,
+                "units_assigned": 0,
+                "schedule": {day: [None]*len(TIME_SLOTS) for day in DAYS}
+            }
 
-    def add_faculty(self, tid, name, role):
-        self.faculties[tid] = Faculty(tid, name, role)
+        self.cursor.execute("SELECT * FROM subjects")
+        self.subjects = self.cursor.fetchall()
 
-    def assign_subject(self, code, name, type, hrs_per_week, section, teacher_id):
-        subject = Subject(code, name, type, hrs_per_week, section)
-        self.subjects.append(subject)
-        self.faculties[teacher_id].subjects.append(subject)
+    def is_teacher_available(self, t_id, day, slot):
+        return self.teachers[t_id]["schedule"][day][slot] is None
 
-    def generate(self):
-        for subject in self.subjects:
-            tid = self.get_teacher_for_subject(subject)
-            faculty = self.faculties[tid]
-            count = subject.hrs_per_week
+    def assign_teacher(self, t_id, day, slot, subject, section):
+        self.teachers[t_id]["schedule"][day][slot] = f"{subject} ({section})"
+        self.teachers[t_id]["units_assigned"] += 2 if "Lab" in subject else 2
 
-            if subject.type == "Lab":
-                self.assign_lab(subject, faculty)
-                continue
+    def generate(self, force_fill_days=False):
+        self.fetch_data()
+        self.timetable = {sec: {day: ["" for _ in TIME_SLOTS] for day in DAYS} for sec in self.sections}
 
-            for day in DAYS:
-                for i, slot in enumerate(TIME_SLOTS):
-                    if count <= 0:
-                        break
-                    if self.generated_tt[subject.section][day][i] is None:
-                        if faculty.schedule[day][i] is None and self.can_schedule(faculty, day, i):
-                            self.generated_tt[subject.section][day][i] = f"{subject.name} ({faculty.name})"
-                            faculty.schedule[day][i] = f"{subject.name} ({subject.section})"
-                            faculty.units_allocated += UNIT_VALUE[subject.type]
-                            count -= 1
+        for course_code, sname, t_id, credit, hr_per_week, sub_type, section_name in self.subjects:
+            hours_assigned = 0
+            attempts = 0
+            while hours_assigned < hr_per_week and attempts < 200:
+                day = random.choice(DAYS)
+                slot = random.randint(0, len(TIME_SLOTS) - (2 if sub_type == "Lab" else 1))
 
-    def assign_lab(self, subject, faculty):
-        for day in DAYS:
-            for i in range(len(TIME_SLOTS) - 1):
-                if (self.generated_tt[subject.section][day][i] is None and
-                    self.generated_tt[subject.section][day][i+1] is None and
-                    faculty.schedule[day][i] is None and
-                    faculty.schedule[day][i+1] is None):
+                if sub_type == "Lab":
+                    # Labs require 2 continuous slots and must be empty
+                    if slot > len(TIME_SLOTS) - 2:
+                        attempts += 1
+                        continue
+                    if self.timetable[section_name][day][slot] == "" and self.timetable[section_name][day][slot+1] == "" and \
+                       self.is_teacher_available(t_id, day, slot) and self.is_teacher_available(t_id, day, slot+1):
+                        self.timetable[section_name][day][slot] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.timetable[section_name][day][slot+1] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.assign_teacher(t_id, day, slot, sname, section_name)
+                        self.assign_teacher(t_id, day, slot+1, sname, section_name)
+                        hours_assigned += 1
+                else:
+                    if self.timetable[section_name][day][slot] == "" and self.is_teacher_available(t_id, day, slot):
+                        self.timetable[section_name][day][slot] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.assign_teacher(t_id, day, slot, sname, section_name)
+                        hours_assigned += 1
+                attempts += 1
 
-                    self.generated_tt[subject.section][day][i] = f"{subject.name} ({faculty.name})"
-                    self.generated_tt[subject.section][day][i+1] = f"{subject.name} ({faculty.name})"
-                    faculty.schedule[day][i] = f"{subject.name} ({subject.section})"
-                    faculty.schedule[day][i+1] = f"{subject.name} ({subject.section})"
-                    faculty.units_allocated += UNIT_VALUE[subject.type] * 1
-                    return
+    def get_section_timetable(self, section):
+        return self.timetable.get(section, {})
 
-    def get_teacher_for_subject(self, subject):
-        for tid, faculty in self.faculties.items():
-            if subject in faculty.subjects:
-                return tid
-        return None
+    def get_teacher_timetable(self, teacher_id):
+        return self.teachers[teacher_id]['schedule'] if teacher_id in self.teachers else {}
 
-    def can_schedule(self, faculty, day, i):
-        if i > 0 and faculty.schedule[day][i-1] is not None:
-            return False
-        if i < len(TIME_SLOTS)-1 and faculty.schedule[day][i+1] is not None:
-            return False
-        return True
-
-    def get_section_tt(self, section):
-        return self.generated_tt[section]
-
-    def get_faculty_tt(self, tid):
-        return self.faculties[tid].schedule
-
-# Export constants for app.py
-__all__ = ["TimetableGenerator", "DAYS", "TIME_SLOTS"]
 
