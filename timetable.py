@@ -55,25 +55,30 @@ class TimetableGenerator:
 
         conn.close()
 
-    def is_available(self, ttable, tid, day, slot):
-        return ttable[tid][day][slot] is None
+    def is_available(self, ttable, key, day, slot):
+        return ttable[key][day][slot] is None
 
-    def assign(self, ttable, tid, day, slot, entry):
-        ttable[tid][day][slot] = entry
+    def assign(self, ttable, key, day, slot, entry):
+        ttable[key][day][slot] = entry
 
     def generate(self):
-        # Sort subjects to prioritize those with more hours
+        # Sort subjects descending by hours needed
         self.subjects.sort(key=lambda s: -s['hr_per_week'])
+
         for subj in self.subjects:
             options = sorted(self.teachers.keys(), key=lambda tid: self.teachers[tid]['assigned_units'])
+            assigned = False
             for tid in options:
                 teacher = self.teachers[tid]
                 if teacher['assigned_units'] + subj['hr_per_week'] <= teacher['max_units']:
                     slots_assigned = 0
-                    while slots_assigned < subj['hr_per_week']:
+                    attempts = 0
+                    max_attempts = 1000  # To avoid infinite loops
+                    while slots_assigned < subj['hr_per_week'] and attempts < max_attempts:
                         day = random.choice(DAYS)
                         if subj['type'] == 'lab':
-                            for i in range(len(TIME_SLOTS)-1):
+                            # Labs need 2 consecutive slots
+                            for i in range(len(TIME_SLOTS) - 1):
                                 if self.is_available(self.section_timetable, subj['section'], day, i) and \
                                    self.is_available(self.section_timetable, subj['section'], day, i+1) and \
                                    self.is_available(self.teacher_timetable, tid, day, i) and \
@@ -87,7 +92,8 @@ class TimetableGenerator:
                                     slots_assigned += 2
                                     break
                         else:
-                            preferred_slots = [0, 1] if slots_assigned < 2 else list(range(7))
+                            # For theory, prefer first 2 slots for first 2 hours
+                            preferred_slots = [0, 1] if slots_assigned < 2 else list(range(len(TIME_SLOTS)))
                             random.shuffle(preferred_slots)
                             for slot in preferred_slots:
                                 if self.is_available(self.section_timetable, subj['section'], day, slot) and \
@@ -98,7 +104,14 @@ class TimetableGenerator:
                                     teacher['assigned_units'] += 1
                                     slots_assigned += 1
                                     break
-                    break
+                        attempts += 1
+
+                    if slots_assigned == subj['hr_per_week']:
+                        assigned = True
+                        break
+
+            if not assigned:
+                print(f"Warning: Could not assign full hours for {subj['sname']} in section {subj['section']}")
 
     def get_section_timetable(self, section):
         return self.section_timetable[section]
@@ -110,5 +123,7 @@ class TimetableGenerator:
         return {tid: (info['name'], info['assigned_units'], info['max_units']) for tid, info in self.teachers.items()}
 
     def get_color(self, subject_name):
+        if not subject_name:
+            return "#FFFFFF"
         base = subject_name.split()[0]
         return COLOR_MAP.get(base, "#FFFFFF")
