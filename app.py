@@ -2,38 +2,40 @@ import streamlit as st
 import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 
-# Initialize and generate timetable
+# Generate timetable
 gen = TimetableGenerator()
-gen.generate(balance_workload=True)
+gen.generate()
 
-st.title("📅 Timetable Management App")
+st.title("📘 Timetable Management App")
 
-# Section selection
-sections = ["A", "B", "C"]
-selected_section = st.selectbox("Choose Section:", sections)
+view_option = st.selectbox("Select View", ["Section Timetable", "Teacher Timetable", "Teacher Workload Chart"])
 
-section_tt = gen.get_section_timetable(selected_section)
+if view_option == "Section Timetable":
+    section = st.selectbox("Select Section", ["A", "B", "C"])
+    timetable = gen.get_section_timetable(section)
 
-st.markdown(f"### 📘 Timetable for Section {selected_section}")
+    st.subheader(f"🗓️ Timetable for Section {section}")
+    df = pd.DataFrame({day: timetable[day] for day in DAYS}, index=TIME_SLOTS).T
+    st.dataframe(df.style.set_properties(**{'text-align': 'center'}))
 
-df_section = pd.DataFrame(section_tt).T
-df_section.columns = TIME_SLOTS
-st.dataframe(df_section, use_container_width=True)
+elif view_option == "Teacher Timetable":
+    teacher_map = {tid: data['name'] for tid, data in gen.teachers.items()}
+    selected_tid = st.selectbox("Select Teacher", list(teacher_map.keys()), format_func=lambda x: teacher_map[x])
 
-st.divider()
+    ttable = gen.get_teacher_timetable(selected_tid)
+    st.subheader(f"📚 Timetable for {teacher_map[selected_tid]}")
+    df = pd.DataFrame({day: ttable[day] for day in DAYS}, index=TIME_SLOTS).T
+    st.dataframe(df.style.set_properties(**{'text-align': 'center'}))
 
-# Teacher selection
-teacher_options = [(tid, f"{tid} - {info['name']}") for tid, info in gen.teachers.items()]
-selected_teacher_id = st.selectbox("Choose Teacher:", [t[1] for t in teacher_options])
-selected_teacher_id = selected_teacher_id.split(" - ")[0]
+elif view_option == "Teacher Workload Chart":
+    workload = gen.get_teacher_workload()
+    df = pd.DataFrame([(name, assigned, maxu) for _, (name, assigned, maxu) in workload.items()],
+                      columns=["Name", "Assigned Units", "Max Units"])
+    df["% Used"] = (df["Assigned Units"] / df["Max Units"] * 100).round(1)
 
-st.markdown(f"### 🧑‍🏫 Timetable for {selected_teacher_id} - {gen.teachers[selected_teacher_id]['name']}")
+    teacher_name = st.selectbox("Toggle Teacher", df["Name"].tolist())
+    tdata = df[df["Name"] == teacher_name].iloc[0]
 
-teacher_tt = gen.get_teacher_timetable(selected_teacher_id)
-df_teacher = pd.DataFrame(teacher_tt).T
-df_teacher.columns = TIME_SLOTS
-st.dataframe(df_teacher, use_container_width=True)
-
-# Weekly workload
-workload = sum(slot is not None for day in teacher_tt.values() for slot in day)
-st.markdown(f"#### 💼 Weekly Workload: `{workload}` hours")
+    st.metric("Assigned Units", tdata["Assigned Units"])
+    st.metric("Max Units", tdata["Max Units"])
+    st.progress(min(1.0, tdata["% Used"] / 100))
