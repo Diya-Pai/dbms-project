@@ -23,25 +23,26 @@ def seed_database():
     cursor.execute("SELECT COUNT(*) FROM teachers")
     if cursor.fetchone()[0] == 0:
         teachers = [
-            ("T1", "Dr Thippeswamy G", "HOD", 8),
-            ("T2", "Mahesh G", "Cluster Head", 12),
-            ("T3", "Dr Bharathi R", "Associate Professor", 16),
-            ("T4", "Dr Nagabhushan S V", "Associate Professor", 16),
-            ("T5", "Dr Ashwini N", "Associate Professor", 16),
-            ("T6", "Prof Jagadish P", "Assistant Professor", 24),
-            ("T7", "Dr Shankar Rajagopal", "Assistant Professor", 24),
-            ("T8", "Dr Dhanalakshmi B K", "Assistant Professor", 24),
-            ("T9", "Prof Shilpa M", "Assistant Professor", 24),
-            ("T10", "Prof Goutami Chunumalla", "Assistant Professor", 24),
-            ("T11", "Dr Mohammed Khurram", "Assistant Professor", 24),
-            ("T12", "Prof S Packiya Lekshmi", "Assistant Professor", 24),
-            ("T13", "Prof Arpitha Shivanna", "Assistant Professor", 24),
-            ("T14", "Prof Beerappa Belasakarge", "Assistant Professor", 24),
-            ("T15", "Prof Chaitanya V", "Assistant Professor", 24),
-            ("T16", "Prof Aruna N", "Assistant Professor", 24),
-            ("T17", "Prof Anusha K L", "Assistant Professor", 24),
-            ("T999", "Dr Ramya", "Assistant Professor", 24)
-        ]
+    ("T1", "Dr Thippeswamy G", "HOD", 8),
+    ("T2", "Mahesh G", "Cluster Head", 12),
+    ("T3", "Dr Bharathi R", "Associate Professor", 16),
+    ("T4", "Dr Nagabhushan S V", "Associate Professor", 16),
+    ("T5", "Dr Ashwini N", "Associate Professor", 16),
+    ("T6", "Prof Jagadish P", "Assistant Professor", 24),
+    ("T7", "Dr Shankar Rajagopal", "Assistant Professor", 24),
+    ("T8", "Dr Dhanalakshmi B K", "Assistant Professor", 24),
+    ("T9", "Prof Shilpa M", "Assistant Professor", 24),
+    ("T10", "Prof Goutami Chunumalla", "Assistant Professor", 24),
+    ("T11", "Dr Mohammed Khurram", "Assistant Professor", 24),
+    ("T12", "Prof S Packiya Lekshmi", "Assistant Professor", 24),
+    ("T13", "Prof Arpitha Shivanna", "Assistant Professor", 24),
+    ("T14", "Prof Beerappa Belasakarge", "Assistant Professor", 24),
+    ("T15", "Prof Chaitanya V", "Assistant Professor", 24),
+    ("T16", "Prof Aruna N", "Assistant Professor", 24),
+    ("T17", "Prof Anusha K L", "Assistant Professor", 24),
+    ("T999", "Dr Ramya", "Assistant Professor", 24)
+]
+
         cursor.executemany("INSERT INTO teachers (t_id, name, role, max_units) VALUES (%s, %s, %s, %s)", teachers)
 
     # Insert sections
