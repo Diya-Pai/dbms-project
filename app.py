@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 import sqlite3
+import plotly.express as px
 
 # Initialize timetable generator
 gen = TimetableGenerator()
@@ -19,7 +20,7 @@ st.set_page_config(page_title="Timetable Management App", layout="wide")
 st.title("📅 Timetable Management App")
 
 # Sidebar view selector
-view_option = st.sidebar.radio("Select View:", ("Section Timetable", "Teacher Timetable"))
+view_option = st.sidebar.radio("Select View:", ("Section Timetable", "Teacher Timetable", "Weekly Workload Chart"))
 
 if view_option == "Section Timetable":
     section = st.selectbox("Choose Section:", ["A", "B", "C"])
@@ -45,3 +46,16 @@ elif view_option == "Teacher Timetable":
     df = pd.DataFrame(teacher_schedule).T
     df.columns = TIME_SLOTS
     st.dataframe(df.style.applymap(lambda x: "background-color: lightcoral" if x else ""))
+
+elif view_option == "Weekly Workload Chart":
+    teacher_chart_choice = st.selectbox("Select a teacher to view workload chart:", [f"{tid} - {name}" for tid, name in teachers_list])
+    teacher_id = teacher_chart_choice.split(" - ")[0]
+    teacher_data = gen.teachers[teacher_id]
+    
+    schedule = teacher_data['schedule']
+    workload_by_day = {day: sum(1 for x in schedule[day] if x) for day in DAYS}
+
+    df = pd.DataFrame({"Day": list(workload_by_day.keys()), "Sessions": list(workload_by_day.values())})
+    fig = px.bar(df, x="Day", y="Sessions", title=f"Weekly Workload for {teacher_chart_choice}", color="Sessions",
+                 color_continuous_scale="Teal")
+    st.plotly_chart(fig, use_container_width=True)
