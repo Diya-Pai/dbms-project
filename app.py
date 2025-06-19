@@ -3,11 +3,10 @@ import streamlit as st
 import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 import sqlite3
-import plotly.express as px
 
 # Initialize timetable generator
 gen = TimetableGenerator()
-gen.generate()
+gen.generate(balance_workload=True)
 
 # Load teachers list for selection
 conn = sqlite3.connect("timetable.db")
@@ -51,11 +50,10 @@ elif view_option == "Weekly Workload Chart":
     teacher_chart_choice = st.selectbox("Select a teacher to view workload chart:", [f"{tid} - {name}" for tid, name in teachers_list])
     teacher_id = teacher_chart_choice.split(" - ")[0]
     teacher_data = gen.teachers[teacher_id]
-    
+
     schedule = teacher_data['schedule']
     workload_by_day = {day: sum(1 for x in schedule[day] if x) for day in DAYS}
 
     df = pd.DataFrame({"Day": list(workload_by_day.keys()), "Sessions": list(workload_by_day.values())})
-    fig = px.bar(df, x="Day", y="Sessions", title=f"Weekly Workload for {teacher_chart_choice}", color="Sessions",
-                 color_continuous_scale="Teal")
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader(f"📊 Weekly Workload for {teacher_chart_choice}")
+    st.bar_chart(df.set_index("Day"))
