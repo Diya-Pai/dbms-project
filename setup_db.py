@@ -31,21 +31,26 @@ CREATE TABLE subjects (
 
 # 👩‍🏫 All Teachers (added more to balance the load)
 teachers = [
-    ("T1", "Dr Ashwini N", "Assistant Professor", 18),
-    ("T2", "Prof Shilpa M", "Assistant Professor", 18),
-    ("T3", "Prof Chaitanya V", "Assistant Professor", 18),
-    ("T4", "Dr Nagabhushan S V", "Assistant Professor", 18),
-    ("T5", "Dr Dhanalakshmi B K", "Associate Professor", 18),
-    ("T6", "Prof Goutami Chunumalla", "Assistant Professor", 18),
-    ("T7", "Dr Ramya M R", "Associate Professor", 12),
-    ("T8", "Prof Sandeep M", "Assistant Professor", 18),
-    ("T9", "Dr Shruti A", "Assistant Professor", 18),
-    ("T10", "Prof Beerappa Belasakarge", "Assistant Professor", 18),
-    ("T11", "Dr Yogish H K", "Professor", 18),
-    ("T12", "Prof Keerthi Kulkarni", "Assistant Professor", 18),
-    ("T13", "Prof Sneha Patil", "Assistant Professor", 18),
-    ("T14", "Prof Deepa R", "Assistant Professor", 18),
+    ("T1", "Dr Thippeswamy G", "HOD", 8),
+    ("T2", "Mahesh G", "Cluster Head", 12),
+    ("T3", "Dr Bharathi R", "Associate Professor", 16),
+    ("T4", "Dr Nagabhushan S V", "Associate Professor", 16),
+    ("T5", "Dr Ashwini N", "Associate Professor", 16),
+    ("T6", "Prof Jagadish P", "Assistant Professor", 24),
+    ("T7", "Dr Shankar Rajagopal", "Assistant Professor", 24),
+    ("T8", "Dr Dhanalakshmi B K", "Assistant Professor", 24),
+    ("T9", "Prof Shilpa M", "Assistant Professor", 24),
+    ("T10", "Prof Goutami Chunumalla", "Assistant Professor", 24),
+    ("T11", "Dr Mohammed Khurram", "Assistant Professor", 24),
+    ("T12", "Prof S Packiya Lekshmi", "Assistant Professor", 24),
+    ("T13", "Prof Arpitha Shivanna", "Assistant Professor", 24),
+    ("T14", "Prof Beerappa Belasakarge", "Assistant Professor", 24),
+    ("T15", "Prof Chaitanya V", "Assistant Professor", 24),
+    ("T16", "Prof Aruna N", "Assistant Professor", 24),
+    ("T17", "Prof Anusha K L", "Assistant Professor", 24),
+    ("T999", "Dr Ramya", "Assistant Professor", 24)
 ]
+
 
 cursor.executemany("INSERT INTO teachers VALUES (?, ?, ?, ?)", teachers)
 
