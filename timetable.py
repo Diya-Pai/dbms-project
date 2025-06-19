@@ -50,10 +50,10 @@ class TimetableGenerator:
 
     def assign_class(self, section, subject, teacher_id, sessions_needed):
         is_lab = subject[4] == "lab"
-        for day in DAYS:
-            for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0)):
-                if sessions_needed == 0:
-                    return
+        for i in range(sessions_needed):
+            valid_slots = [(day, slot) for day in DAYS for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0))]
+            random.shuffle(valid_slots)
+            for day, slot in valid_slots:
                 if self.section_timetables[section][day][slot] is None and \
                    (not is_lab or self.section_timetables[section][day][slot + 1] is None) and \
                    self.can_assign(teacher_id, day, slot, is_lab):
@@ -65,7 +65,7 @@ class TimetableGenerator:
                         self.section_timetables[section][day][slot + 1] = label
                         self.teachers[teacher_id]['schedule'][day][slot + 1] = f"{subject[1]} ({section})"
                     self.teachers[teacher_id]['assigned_units'] += (2 if is_lab else 1)
-                    sessions_needed -= 1
+                    break
 
     def generate(self, balance_workload=False, avoid_back_to_back=False, allow_subject_split=False):
         random.shuffle(self.subjects)
