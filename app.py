@@ -4,52 +4,75 @@ import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 from io import BytesIO
 import base64
-import mysql.connector
+import sqlite3
 
 # Initialize timetable generator
 gen = TimetableGenerator()
 
-# Insert initial teacher and subject data into MySQL (if empty)
+# Insert initial teacher and subject data into SQLite (if empty)
 def seed_database():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="1234",
-        database="timetable_db"
-    )
+    conn = sqlite3.connect("timetable.db")
     cursor = conn.cursor()
+
+    # Create tables if they don't exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS teachers (
+            t_id TEXT PRIMARY KEY,
+            name TEXT,
+            role TEXT,
+            max_units INTEGER
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sections (
+            section_name TEXT PRIMARY KEY,
+            class_teacher_id TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS subjects (
+            course_code TEXT,
+            sname TEXT,
+            t_id TEXT,
+            credit INTEGER,
+            hr_per_week INTEGER,
+            type TEXT,
+            section_name TEXT
+        )
+    """)
 
     # Insert teachers if table is empty
     cursor.execute("SELECT COUNT(*) FROM teachers")
     if cursor.fetchone()[0] == 0:
         teachers = [
-    ("T1", "Dr Thippeswamy G", "HOD", 8),
-    ("T2", "Mahesh G", "Cluster Head", 12),
-    ("T3", "Dr Bharathi R", "Associate Professor", 16),
-    ("T4", "Dr Nagabhushan S V", "Associate Professor", 16),
-    ("T5", "Dr Ashwini N", "Associate Professor", 16),
-    ("T6", "Prof Jagadish P", "Assistant Professor", 24),
-    ("T7", "Dr Shankar Rajagopal", "Assistant Professor", 24),
-    ("T8", "Dr Dhanalakshmi B K", "Assistant Professor", 24),
-    ("T9", "Prof Shilpa M", "Assistant Professor", 24),
-    ("T10", "Prof Goutami Chunumalla", "Assistant Professor", 24),
-    ("T11", "Dr Mohammed Khurram", "Assistant Professor", 24),
-    ("T12", "Prof S Packiya Lekshmi", "Assistant Professor", 24),
-    ("T13", "Prof Arpitha Shivanna", "Assistant Professor", 24),
-    ("T14", "Prof Beerappa Belasakarge", "Assistant Professor", 24),
-    ("T15", "Prof Chaitanya V", "Assistant Professor", 24),
-    ("T16", "Prof Aruna N", "Assistant Professor", 24),
-    ("T17", "Prof Anusha K L", "Assistant Professor", 24),
-    ("T999", "Dr Ramya", "Assistant Professor", 24)
-]
-
-        cursor.executemany("INSERT INTO teachers (t_id, name, role, max_units) VALUES (%s, %s, %s, %s)", teachers)
+            ("T1", "Dr Thippeswamy G", "HOD", 8),
+            ("T2", "Mahesh G", "Cluster Head", 12),
+            ("T3", "Dr Bharathi R", "Associate Professor", 16),
+            ("T4", "Dr Nagabhushan S V", "Associate Professor", 16),
+            ("T5", "Dr Ashwini N", "Associate Professor", 16),
+            ("T6", "Prof Jagadish P", "Assistant Professor", 24),
+            ("T7", "Dr Shankar Rajagopal", "Assistant Professor", 24),
+            ("T8", "Dr Dhanalakshmi B K", "Assistant Professor", 24),
+            ("T9", "Prof Shilpa M", "Assistant Professor", 24),
+            ("T10", "Prof Goutami Chunumalla", "Assistant Professor", 24),
+            ("T11", "Dr Mohammed Khurram", "Assistant Professor", 24),
+            ("T12", "Prof S Packiya Lekshmi", "Assistant Professor", 24),
+            ("T13", "Prof Arpitha Shivanna", "Assistant Professor", 24),
+            ("T14", "Prof Beerappa Belasakarge", "Assistant Professor", 24),
+            ("T15", "Prof Chaitanya V", "Assistant Professor", 24),
+            ("T16", "Prof Aruna N", "Assistant Professor", 24),
+            ("T17", "Prof Anusha K L", "Assistant Professor", 24),
+            ("T999", "Dr Ramya", "Assistant Professor", 24)
+        ]
+        cursor.executemany("INSERT INTO teachers (t_id, name, role, max_units) VALUES (?, ?, ?, ?)", teachers)
 
     # Insert sections
     cursor.execute("SELECT COUNT(*) FROM sections")
     if cursor.fetchone()[0] == 0:
         sections = [("A", "T1"), ("B", "T2"), ("C", "T3")]
-        cursor.executemany("INSERT INTO sections (section_name, class_teacher_id) VALUES (%s, %s)", sections)
+        cursor.executemany("INSERT INTO sections (section_name, class_teacher_id) VALUES (?, ?)", sections)
 
     # Insert subjects if empty
     cursor.execute("SELECT COUNT(*) FROM subjects")
@@ -70,14 +93,14 @@ def seed_database():
         for sec in ["A", "B", "C"]:
             for s in subject_template:
                 all_subjects.append((s[0], s[1], s[2], s[3], s[4], s[5], sec))
-        cursor.executemany(
-            "INSERT INTO subjects (course_code, sname, t_id, credit, hr_per_week, type, section_name) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            all_subjects
-        )
+        cursor.executemany("INSERT INTO subjects (course_code, sname, t_id, credit, hr_per_week, type, section_name) VALUES (?, ?, ?, ?, ?, ?, ?)", all_subjects)
 
     conn.commit()
     cursor.close()
     conn.close()
+
+# Call seed function
+seed_database()
 
 # Load from MySQL
 def load_from_mysql():
