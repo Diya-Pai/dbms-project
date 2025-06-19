@@ -1,129 +1,74 @@
+# timetable.py
 import sqlite3
 import random
-from collections import defaultdict
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 TIME_SLOTS = [
-    "8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50",
-    "1:45-2:45", "2:45-3:45", "3:45-4:45"
+    "8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50", "1:45-2:45", "2:45-3:45", "3:45-4:45"
 ]
-
-COLOR_MAP = {
-    "ADA": "#FFCCCC",
-    "MC": "#CCFFCC",
-    "DBMS": "#CCCCFF",
-    "Math": "#FFFFCC",
-    "Bio": "#FFCCFF",
-    "UHV": "#CCE5FF",
-    "ADA Lab": "#FF9999",
-    "MC Lab": "#99FF99",
-    "DBMS Lab": "#9999FF",
-    "UI/UX Lab": "#FFCC99"
-}
 
 class TimetableGenerator:
     def __init__(self):
+        self.conn = sqlite3.connect("timetable.db")
+        self.cursor = self.conn.cursor()
+        self.sections = ["A", "B", "C"]
         self.teachers = {}
         self.subjects = []
-        self.section_timetable = defaultdict(lambda: {day: [None]*7 for day in DAYS})
-        self.teacher_timetable = defaultdict(lambda: {day: [None]*7 for day in DAYS})
-        self.load_data()
+        self.timetable = {}
 
-    def load_data(self):
-        conn = sqlite3.connect("timetable.db")
-        c = conn.cursor()
-
-        for row in c.execute("SELECT * FROM teachers"):
-            t_id, name, role, max_units = row
+    def fetch_data(self):
+        self.cursor.execute("SELECT * FROM teachers")
+        for t_id, name, role, max_units in self.cursor.fetchall():
             self.teachers[t_id] = {
                 "name": name,
                 "role": role,
                 "max_units": max_units,
-                "assigned_units": 0
+                "units_assigned": 0,
+                "schedule": {day: [None]*len(TIME_SLOTS) for day in DAYS}
             }
 
-        for row in c.execute("SELECT course_code, sname, credit, hr_per_week, type, section_name FROM subjects"):
-            code, sname, credit, hrs, stype, section = row
-            self.subjects.append({
-                "course_code": code,
-                "sname": sname,
-                "credit": credit,
-                "hr_per_week": hrs,
-                "type": stype,
-                "section": section
-            })
+        self.cursor.execute("SELECT * FROM subjects")
+        self.subjects = self.cursor.fetchall()
 
-        conn.close()
+    def is_teacher_available(self, t_id, day, slot):
+        return self.teachers[t_id]["schedule"][day][slot] is None
 
-    def is_available(self, ttable, key, day, slot):
-        return ttable[key][day][slot] is None
+    def assign_teacher(self, t_id, day, slot, subject, section):
+        self.teachers[t_id]["schedule"][day][slot] = f"{subject} ({section})"
+        self.teachers[t_id]["units_assigned"] += 2 if "Lab" in subject else 2
 
-    def assign(self, ttable, key, day, slot, entry):
-        ttable[key][day][slot] = entry
+    def generate(self, force_fill_days=False):
+        self.fetch_data()
+        self.timetable = {sec: {day: ["" for _ in TIME_SLOTS] for day in DAYS} for sec in self.sections}
 
-    def generate(self):
-        # Sort subjects descending by hours needed
-        self.subjects.sort(key=lambda s: -s['hr_per_week'])
+        for course_code, sname, t_id, credit, hr_per_week, sub_type, section_name in self.subjects:
+            hours_assigned = 0
+            attempts = 0
+            while hours_assigned < hr_per_week and attempts < 200:
+                day = random.choice(DAYS)
+                slot = random.randint(0, len(TIME_SLOTS) - (2 if sub_type == "Lab" else 1))
 
-        for subj in self.subjects:
-            options = sorted(self.teachers.keys(), key=lambda tid: self.teachers[tid]['assigned_units'])
-            assigned = False
-            for tid in options:
-                teacher = self.teachers[tid]
-                if teacher['assigned_units'] + subj['hr_per_week'] <= teacher['max_units']:
-                    slots_assigned = 0
-                    attempts = 0
-                    max_attempts = 1000  # To avoid infinite loops
-                    while slots_assigned < subj['hr_per_week'] and attempts < max_attempts:
-                        day = random.choice(DAYS)
-                        if subj['type'] == 'lab':
-                            # Labs need 2 consecutive slots
-                            for i in range(len(TIME_SLOTS) - 1):
-                                if self.is_available(self.section_timetable, subj['section'], day, i) and \
-                                   self.is_available(self.section_timetable, subj['section'], day, i+1) and \
-                                   self.is_available(self.teacher_timetable, tid, day, i) and \
-                                   self.is_available(self.teacher_timetable, tid, day, i+1):
-                                    label = f"{subj['sname']} Lab ({subj['section']})"
-                                    self.assign(self.section_timetable, subj['section'], day, i, label)
-                                    self.assign(self.section_timetable, subj['section'], day, i+1, label)
-                                    self.assign(self.teacher_timetable, tid, day, i, label)
-                                    self.assign(self.teacher_timetable, tid, day, i+1, label)
-                                    teacher['assigned_units'] += 2
-                                    slots_assigned += 2
-                                    break
-                        else:
-                            # For theory, prefer first 2 slots for first 2 hours
-                            preferred_slots = [0, 1] if slots_assigned < 2 else list(range(len(TIME_SLOTS)))
-                            random.shuffle(preferred_slots)
-                            for slot in preferred_slots:
-                                if self.is_available(self.section_timetable, subj['section'], day, slot) and \
-                                   self.is_available(self.teacher_timetable, tid, day, slot):
-                                    label = f"{subj['sname']} ({subj['section']})"
-                                    self.assign(self.section_timetable, subj['section'], day, slot, label)
-                                    self.assign(self.teacher_timetable, tid, day, slot, label)
-                                    teacher['assigned_units'] += 1
-                                    slots_assigned += 1
-                                    break
+                if sub_type == "Lab":
+                    # Labs require 2 continuous slots and must be empty
+                    if slot > len(TIME_SLOTS) - 2:
                         attempts += 1
-
-                    if slots_assigned == subj['hr_per_week']:
-                        assigned = True
-                        break
-
-            if not assigned:
-                print(f"Warning: Could not assign full hours for {subj['sname']} in section {subj['section']}")
+                        continue
+                    if self.timetable[section_name][day][slot] == "" and self.timetable[section_name][day][slot+1] == "" and \
+                       self.is_teacher_available(t_id, day, slot) and self.is_teacher_available(t_id, day, slot+1):
+                        self.timetable[section_name][day][slot] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.timetable[section_name][day][slot+1] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.assign_teacher(t_id, day, slot, sname, section_name)
+                        self.assign_teacher(t_id, day, slot+1, sname, section_name)
+                        hours_assigned += 1
+                else:
+                    if self.timetable[section_name][day][slot] == "" and self.is_teacher_available(t_id, day, slot):
+                        self.timetable[section_name][day][slot] = f"{sname} ({self.teachers[t_id]['name']})"
+                        self.assign_teacher(t_id, day, slot, sname, section_name)
+                        hours_assigned += 1
+                attempts += 1
 
     def get_section_timetable(self, section):
-        return self.section_timetable[section]
+        return self.timetable.get(section, {})
 
-    def get_teacher_timetable(self, tid):
-        return self.teacher_timetable[tid]
-
-    def get_teacher_workload(self):
-        return {tid: (info['name'], info['assigned_units'], info['max_units']) for tid, info in self.teachers.items()}
-
-    def get_color(self, subject_name):
-        if not subject_name:
-            return "#FFFFFF"
-        base = subject_name.split()[0]
-        return COLOR_MAP.get(base, "#FFFFFF")
+    def get_teacher_timetable(self, teacher_id):
+        return self.teachers[teacher_id]['schedule'] if teacher_id in self.teachers else {}
