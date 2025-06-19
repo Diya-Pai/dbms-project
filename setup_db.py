@@ -3,7 +3,7 @@ import sqlite3
 conn = sqlite3.connect("timetable.db")
 cursor = conn.cursor()
 
-# Drop existing tables
+# Drop existing tables if any
 cursor.execute("DROP TABLE IF EXISTS teachers")
 cursor.execute("DROP TABLE IF EXISTS subjects")
 
@@ -29,7 +29,7 @@ CREATE TABLE subjects (
 )
 """)
 
-# 👩‍🏫 All Teachers (added more to balance the load)
+# Teachers data
 teachers = [
     ("T1", "Dr Thippeswamy G", "HOD", 8),
     ("T2", "Mahesh G", "Cluster Head", 12),
@@ -51,11 +51,9 @@ teachers = [
     ("T999", "Dr Ramya", "Assistant Professor", 24)
 ]
 
-
 cursor.executemany("INSERT INTO teachers VALUES (?, ?, ?, ?)", teachers)
 
-# 📚 Subjects repeated per section
-subjects = []
+# Subjects data for all sections
 base_subjects = [
     ("CS301", "ADA", 3, 4, "theory"),
     ("CS302", "MC", 3, 3, "theory"),
@@ -69,6 +67,7 @@ base_subjects = [
     ("CS304L", "UI/UX Lab", 1, 2, "lab")
 ]
 
+subjects = []
 for section in ["A", "B", "C"]:
     for subj in base_subjects:
         subjects.append((subj[0], subj[1], subj[2], subj[3], subj[4], section))
