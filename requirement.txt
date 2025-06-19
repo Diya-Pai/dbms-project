@@ -4,3 +4,4 @@ xlsxwriter
 openpyxl
 fpdf
 mysql-connector-python
+plotly
