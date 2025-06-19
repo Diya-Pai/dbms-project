@@ -4,7 +4,7 @@ from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 
 st.title("📘 Timetable Management App")
 
-# Initialize and regenerate each time for clean start
+# Initialize and regenerate timetable on each run for clean start
 gen = TimetableGenerator()
 gen.generate()
 
