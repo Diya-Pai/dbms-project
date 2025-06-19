@@ -1,45 +1,73 @@
 # app.py
 import streamlit as st
-from timetable import TimetableGenerator
+from timetable import TimetableGenerator, DAYS, TIME_SLOTS
 
 # Initialize timetable generator
 gen = TimetableGenerator()
 
-# Sample faculties
-gen.add_faculty("T1", "Dr. A", "HOD")
-gen.add_faculty("T2", "Dr. B", "Cluster Head")
-gen.add_faculty("T3", "Dr. C", "Associate Professor")
-gen.add_faculty("T4", "Dr. D", "Assistant Professor")
+# Add faculty pool
+gen.add_faculty("T1", "Dr. Ada", "HOD")
+gen.add_faculty("T2", "Dr. Bob", "Cluster Head")
+gen.add_faculty("T3", "Dr. Charlie", "Associate Professor")
+gen.add_faculty("T4", "Dr. Dana", "Assistant Professor")
+gen.add_faculty("T5", "Dr. Eva", "Assistant Professor")
+gen.add_faculty("T6", "Dr. Frank", "Assistant Professor")
 
-# Assigning subjects
-gen.assign_subject("CS101", "DSA", "Theory", 3, "A", "T1")
-gen.assign_subject("CS101", "DSA", "Theory", 3, "B", "T1")
-gen.assign_subject("CS102", "OS", "Theory", 3, "A", "T2")
-gen.assign_subject("CS103", "DBMS", "Theory", 3, "C", "T3")
-gen.assign_subject("CS104", "CN Lab", "Lab", 2, "A", "T4")
+# Subjects and labs to be randomly assigned to teachers
+theory_subjects = [
+    ("ADA", 4),
+    ("MC", 3),
+    ("DBMS", 3),
+    ("Math", 4),
+    ("Bio", 2),
+    ("UHV", 1)
+]
+
+labs = [
+    ("ADA Lab",),
+    ("UI/UX Lab",),
+    ("MC Lab",),
+    ("DBMS Lab",)
+]
+
+import random
+sections = ["A", "B", "C"]
+all_teachers = list(gen.faculties.keys())
+
+# Assign theory subjects randomly
+for section in sections:
+    for sname, freq in theory_subjects:
+        tid = random.choice(all_teachers)
+        gen.assign_subject(sname, sname, "Theory", freq, section, tid)
+
+# Assign labs randomly
+for section in sections:
+    for lname_tuple in labs:
+        lname = lname_tuple[0]
+        tid = random.choice(all_teachers)
+        gen.assign_subject(lname, lname, "Lab", 1, section, tid)
 
 # Generate timetable
 gen.generate()
 
 st.title("📅 Timetable Management App")
 
-menu = st.sidebar.selectbox("View Timetable", ["Section", "Faculty"])
+menu = st.sidebar.selectbox("View Timetable", ["All Sections", "All Faculty"])
 
-if menu == "Section":
-    section = st.selectbox("Select Section", ["A", "B", "C"])
-    st.subheader(f"Timetable for Section {section}")
-    tt = gen.get_section_tt(section)
-    for day in tt:
-        st.markdown(f"**{day}**")
-        row = tt[day]
-        st.table({slot: val if val else "-" for slot, val in zip(range(1, 7), row)})
+if menu == "All Sections":
+    for section in sections:
+        st.subheader(f"📘 Timetable for Section {section}")
+        tt = gen.get_section_tt(section)
+        for day in DAYS:
+            st.markdown(f"**{day}**")
+            slots = tt[day]
+            st.table({slot: val if val else "-" for slot, val in zip(TIME_SLOTS, slots)})
 
-elif menu == "Faculty":
-    faculty_id = st.selectbox("Select Faculty", list(gen.faculties.keys()))
-    faculty = gen.faculties[faculty_id]
-    st.subheader(f"Timetable for {faculty.name} ({faculty.role})")
-    tt = gen.get_faculty_tt(faculty_id)
-    for day in tt:
-        st.markdown(f"**{day}**")
-        row = tt[day]
-        st.table({slot: val if val else "-" for slot, val in zip(range(1, 7), row)})
+elif menu == "All Faculty":
+    for faculty_id, faculty in gen.faculties.items():
+        st.subheader(f"👨‍🏫 Timetable for {faculty.name} ({faculty.role})")
+        tt = gen.get_faculty_tt(faculty_id)
+        for day in DAYS:
+            st.markdown(f"**{day}**")
+            slots = tt[day]
+            st.table({slot: val if val else "-" for slot, val in zip(TIME_SLOTS, slots)})
