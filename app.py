@@ -1,47 +1,59 @@
+# app.py
 import streamlit as st
 import pandas as pd
 from timetable import TimetableGenerator, DAYS, TIME_SLOTS
+import sqlite3
 
-st.title("📘 Timetable Management App")
-
-# Initialize and regenerate timetable on each run for clean start
+# Initialize timetable generator
 gen = TimetableGenerator()
-gen.generate()
+gen.generate(balance_workload=True)
 
-view_choice = st.radio("Select View:", ["Section Timetable", "Teacher Timetable"])
+# Load teachers list for selection
+conn = sqlite3.connect("timetable.db")
+cursor = conn.cursor()
+cursor.execute("SELECT t_id, name FROM teachers")
+teachers_list = cursor.fetchall()
+conn.close()
 
-if view_choice == "Section Timetable":
-    section = st.selectbox("Select Section:", ["A", "B", "C"])
+st.set_page_config(page_title="Timetable Management App", layout="wide")
+st.title("📅 Timetable Management App")
+
+# Sidebar view selector
+view_option = st.sidebar.radio("Select View:", ("Section Timetable", "Teacher Timetable", "Weekly Workload Chart"))
+
+if view_option == "Section Timetable":
+    section = st.selectbox("Choose Section:", ["A", "B", "C"])
     timetable = gen.get_section_timetable(section)
-    if timetable:
-        df = pd.DataFrame.from_dict(timetable, orient='index', columns=TIME_SLOTS)
-        styled_df = df.style.applymap(lambda val: f'background-color: {gen.get_color(val)}' if val else '')
-        st.dataframe(styled_df, use_container_width=True)
-    else:
-        st.warning("No timetable generated for this section.")
+    st.subheader(f"📘 Timetable for Section {section}")
 
-elif view_choice == "Teacher Timetable":
-    teacher_names = {tid: info['name'] for tid, info in gen.teachers.items()}
-    if teacher_names:
-        tid = st.selectbox("Select Teacher:", list(teacher_names.keys()), format_func=lambda x: teacher_names[x])
-        timetable = gen.get_teacher_timetable(tid)
-        if timetable:
-            df = pd.DataFrame.from_dict(timetable, orient='index', columns=TIME_SLOTS)
-            styled_df = df.style.applymap(lambda val: f'background-color: {gen.get_color(val)}' if val else '')
-            st.dataframe(styled_df, use_container_width=True)
+    df = pd.DataFrame(timetable).T
+    df.columns = TIME_SLOTS
+    st.dataframe(df.style.applymap(lambda x: "background-color: lightpink" if "ADA" in str(x) else
+                                             "background-color: lightblue" if "DBMS" in str(x) else
+                                             "background-color: lightgreen" if "MC" in str(x) else
+                                             "background-color: plum" if "Math" in str(x) else
+                                             "background-color: lemonchiffon" if "UI/UX" in str(x) else
+                                             "background-color: moccasin" if "Bio" in str(x) else
+                                             "background-color: palegreen" if "UHV" in str(x) else ""))
 
-            st.subheader("📊 Weekly Workload")
-            workload = gen.get_teacher_workload()
-            data = pd.DataFrame([
-                {"Teacher": name, "Assigned Units": assigned, "Max Units": max_u}
-                for _, (name, assigned, max_u) in workload.items()
-            ])
-            selected = data[data["Teacher"] == teacher_names[tid]]
-            if not selected.empty:
-                st.bar_chart(selected.set_index("Teacher")[["Assigned Units"]])
-            else:
-                st.info("No workload data available.")
-        else:
-            st.warning("No timetable generated for this teacher.")
-    else:
-        st.warning("No teachers found.")
+elif view_option == "Teacher Timetable":
+    teacher_choice = st.selectbox("Choose Teacher:", [f"{tid} - {name}" for tid, name in teachers_list])
+    teacher_id = teacher_choice.split(" - ")[0]
+    teacher_schedule = gen.get_teacher_timetable(teacher_id)
+    st.subheader(f"👩‍🏫 Timetable for {teacher_choice}")
+
+    df = pd.DataFrame(teacher_schedule).T
+    df.columns = TIME_SLOTS
+    st.dataframe(df.style.applymap(lambda x: "background-color: lightcoral" if x else ""))
+
+elif view_option == "Weekly Workload Chart":
+    teacher_chart_choice = st.selectbox("Select a teacher to view workload chart:", [f"{tid} - {name}" for tid, name in teachers_list])
+    teacher_id = teacher_chart_choice.split(" - ")[0]
+    teacher_data = gen.teachers[teacher_id]
+
+    schedule = teacher_data['schedule']
+    workload_by_day = {day: sum(1 for x in schedule[day] if x) for day in DAYS}
+
+    df = pd.DataFrame({"Day": list(workload_by_day.keys()), "Sessions": list(workload_by_day.values())})
+    st.subheader(f"📊 Weekly Workload for {teacher_chart_choice}")
+    st.bar_chart(df.set_index("Day"))
