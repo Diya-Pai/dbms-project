@@ -1,4 +1,3 @@
-# timetable.py
 import sqlite3
 import random
 from collections import defaultdict
@@ -8,104 +7,96 @@ TIME_SLOTS = ["8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50", "1:45-2:4
 
 class TimetableGenerator:
     def __init__(self):
-        self.sections = ["A", "B", "C"]
-        self.subjects = []
-        self.teachers = {}
-        self.section_timetables = {sec: {day: [None]*7 for day in DAYS} for sec in self.sections}
+        self.conn = sqlite3.connect("timetable.db")
+        self.cursor = self.conn.cursor()
+
+        self.teachers = {}  # t_id -> {name, role, max_units, assigned}
+        self.subjects = defaultdict(list)  # section -> list of (subj)
+        self.teacher_timetable = defaultdict(lambda: {day: ["None"] * 7 for day in DAYS})
+        self.section_timetable = defaultdict(lambda: {day: ["None"] * 7 for day in DAYS})
+        self.assigned_hours = defaultdict(int)
+
         self.load_data()
 
     def load_data(self):
-        conn = sqlite3.connect("timetable.db")
-        cursor = conn.cursor()
+        for row in self.cursor.execute("SELECT * FROM teachers"):
+            t_id, name, role, maxu = row
+            self.teachers[t_id] = {"name": name, "role": role, "max_units": maxu, "assigned": 0}
 
-        cursor.execute("SELECT t_id, name, role, max_units FROM teachers")
-        for tid, name, role, max_units in cursor.fetchall():
-            self.teachers[tid] = {
-                'name': name,
-                'role': role,
-                'max_units': max_units,
-                'assigned_units': 0,
-                'schedule': {day: [None]*7 for day in DAYS}
-            }
+        for row in self.cursor.execute("SELECT * FROM subjects"):
+            code, sname, credit, hrs, stype, section = row
+            self.subjects[section].append({
+                "code": code, "name": sname, "hrs": hrs,
+                "type": stype, "teacher": None
+            })
 
-        cursor.execute("SELECT course_code, sname, credit, hr_per_week, type, section_name FROM subjects")
-        self.subjects = cursor.fetchall()
+    def find_available_teacher(self, hrs_needed):
+        candidates = sorted(
+            [(tid, data) for tid, data in self.teachers.items() if tid != "T999" and data["assigned"] + hrs_needed <= data["max_units"]],
+            key=lambda x: x[1]["assigned"]
+        )
+        return candidates[0][0] if candidates else None
 
-        conn.close()
+    def assign_teacher_to_subjects(self):
+        for section, subs in self.subjects.items():
+            for subj in subs:
+                hrs = subj["hrs"]
+                teacher = self.find_available_teacher(hrs)
+                if teacher:
+                    subj["teacher"] = teacher
+                    self.teachers[teacher]["assigned"] += hrs
 
-    def can_assign(self, teacher_id, day, slot, is_lab):
-        teacher = self.teachers[teacher_id]
-        schedule = teacher['schedule'][day]
+    def slot_available(self, timetable, day, slot):
+        return timetable[day][slot] == "None"
 
-        if schedule[slot] is not None:
-            return False
-        if is_lab:
-            if slot >= len(TIME_SLOTS) - 1 or schedule[slot + 1] is not None:
-                return False
-        neighbors = []
-        if slot > 0:
-            neighbors.append(schedule[slot - 1])
-        if slot < len(TIME_SLOTS) - 1:
-            neighbors.append(schedule[slot + 1])
-        if all(n is None for n in neighbors):
-            return False
+    def assign_to_slot(self, section, teacher, day, slot, name):
+        self.section_timetable[section][day][slot] = name
+        self.teacher_timetable[teacher][day][slot] = name
+        self.assigned_hours[(section, day, slot)] = 1
 
-        return True
+    def generate(self):
+        self.assign_teacher_to_subjects()
 
-    def assign_class(self, section, subject, teacher_id, sessions_needed):
-        is_lab = subject[4] == "lab"
-        for i in range(sessions_needed):
-            valid_slots = [(day, slot) for day in DAYS for slot in range(len(TIME_SLOTS) - (1 if is_lab else 0))]
-            random.shuffle(valid_slots)
-            valid_slots = sorted(
-                valid_slots,
-                key=lambda x: (
-                    sum(slot is not None for slot in self.section_timetables[section][x[0]]),
-                    x[1]
-                )
-            )
-            for day, slot in valid_slots:
-                if self.section_timetables[section][day][slot] is None and \
-                   (not is_lab or self.section_timetables[section][day][slot + 1] is None) and \
-                   self.can_assign(teacher_id, day, slot, is_lab):
+        for section, subs in self.subjects.items():
+            for subj in subs:
+                hrs = subj["hrs"]
+                name = f"{subj['name']} ({section})"
+                teacher = subj["teacher"]
 
-                    label = f"{subject[1]} ({self.teachers[teacher_id]['name']})"
-                    self.section_timetables[section][day][slot] = label
-                    self.teachers[teacher_id]['schedule'][day][slot] = f"{subject[1]} ({section})"
-                    if is_lab:
-                        self.section_timetables[section][day][slot + 1] = label
-                        self.teachers[teacher_id]['schedule'][day][slot + 1] = f"{subject[1]} ({section})"
-                    self.teachers[teacher_id]['assigned_units'] += (2 if is_lab else 1)
-                    break
-
-    def generate(self, balance_workload=True, avoid_back_to_back=False, allow_subject_split=False):
-        random.shuffle(self.subjects)
-        subject_groups = defaultdict(list)
-        for s in self.subjects:
-            subject_groups[s[1]].append(s)
-
-        for subj_list in subject_groups.values():
-            for subject in subj_list:
-                assigned = False
-                retries = 0
-                sorted_teachers = sorted(
-                    self.teachers.items(),
-                    key=lambda item: item[1]['assigned_units'] / item[1]['max_units'] if item[1]['max_units'] > 0 else 1
-                )
-                while not assigned and retries < len(sorted_teachers):
-                    teacher_id = sorted_teachers[retries][0]
-                    teacher = self.teachers[teacher_id]
-                    needed_units = (2 if subject[4] == 'lab' else 1) * subject[3]
-                    if teacher['assigned_units'] + needed_units <= teacher['max_units']:
-                        self.assign_class(subject[5], subject, teacher_id, subject[3])
-                        assigned = True
-                    retries += 1
+                if subj["type"] == "lab":
+                    placed = False
+                    for day in DAYS:
+                        for i in range(len(TIME_SLOTS) - 1):
+                            if all([
+                                self.slot_available(self.section_timetable[section], day, i),
+                                self.slot_available(self.section_timetable[section], day, i+1),
+                                self.slot_available(self.teacher_timetable[teacher], day, i),
+                                self.slot_available(self.teacher_timetable[teacher], day, i+1)
+                            ]):
+                                self.assign_to_slot(section, teacher, day, i, name)
+                                self.assign_to_slot(section, teacher, day, i+1, name)
+                                placed = True
+                                break
+                        if placed:
+                            break
+                else:
+                    hours_placed = 0
+                    for day in DAYS:
+                        for i in range(len(TIME_SLOTS)):
+                            if hours_placed >= hrs:
+                                break
+                            if self.slot_available(self.section_timetable[section], day, i) and self.slot_available(self.teacher_timetable[teacher], day, i):
+                                self.assign_to_slot(section, teacher, day, i, name)
+                                hours_placed += 1
 
     def get_section_timetable(self, section):
-        return self.section_timetables[section]
+        return self.section_timetable[section]
 
-    def get_teacher_timetable(self, teacher_id):
-        return self.teachers[teacher_id]['schedule']
+    def get_teacher_timetable(self, t_id):
+        return self.teacher_timetable[t_id]
 
     def get_teacher_workload(self):
-        return {tid: (t['name'], t['assigned_units'], t['max_units']) for tid, t in self.teachers.items()}
+        return {
+            tid: (data["name"], data["assigned"], data["max_units"])
+            for tid, data in self.teachers.items()
+        }
