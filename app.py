@@ -53,7 +53,8 @@ elif view_option == "Weekly Workload Chart":
 
     schedule = teacher_data['schedule']
     workload_by_day = {day: sum(1 for x in schedule[day] if x) for day in DAYS}
+    workload_total = sum(workload_by_day.values())
 
     df = pd.DataFrame({"Day": list(workload_by_day.keys()), "Sessions": list(workload_by_day.values())})
-    st.subheader(f"📊 Weekly Workload for {teacher_chart_choice}")
+    st.subheader(f"📊 Weekly Workload for {teacher_chart_choice} - Total: {workload_total} sessions")
     st.bar_chart(df.set_index("Day"))
