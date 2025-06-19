@@ -4,9 +4,11 @@ from collections import defaultdict
 
 # Constants
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-TIME_SLOTS = ["9-10", "10-11", "11-12", "12-1", "2-3", "3-4"]
+TIME_SLOTS = [
+    "8:30-9:30", "9:30-10:30", "10:45-11:45", "11:45-12:50",
+    "1:45-2:45", "2:45-3:45", "3:45-4:45"
+]  # Skipping short break and lunch
 
-# Role-based max units per week
 ROLE_UNITS = {
     "HOD": 8,
     "Cluster Head": 12,
@@ -59,18 +61,37 @@ class TimetableGenerator:
         for subject in self.subjects:
             tid = self.get_teacher_for_subject(subject)
             faculty = self.faculties[tid]
-            units = UNIT_VALUE[subject.type] * subject.hrs_per_week
             count = subject.hrs_per_week
+
+            if subject.type == "Lab":
+                self.assign_lab(subject, faculty)
+                continue
+
             for day in DAYS:
                 for i, slot in enumerate(TIME_SLOTS):
                     if count <= 0:
                         break
                     if self.generated_tt[subject.section][day][i] is None:
-                        if faculty.schedule[day][i] is None and self.can_schedule(faculty, day, i, subject.type):
-                            self.generated_tt[subject.section][day][i] = (subject.name, faculty.name)
-                            faculty.schedule[day][i] = subject.name
+                        if faculty.schedule[day][i] is None and self.can_schedule(faculty, day, i):
+                            self.generated_tt[subject.section][day][i] = f"{subject.name} ({faculty.name})"
+                            faculty.schedule[day][i] = f"{subject.name} ({subject.section})"
                             faculty.units_allocated += UNIT_VALUE[subject.type]
                             count -= 1
+
+    def assign_lab(self, subject, faculty):
+        for day in DAYS:
+            for i in range(len(TIME_SLOTS) - 1):
+                if (self.generated_tt[subject.section][day][i] is None and
+                    self.generated_tt[subject.section][day][i+1] is None and
+                    faculty.schedule[day][i] is None and
+                    faculty.schedule[day][i+1] is None):
+
+                    self.generated_tt[subject.section][day][i] = f"{subject.name} ({faculty.name})"
+                    self.generated_tt[subject.section][day][i+1] = f"{subject.name} ({faculty.name})"
+                    faculty.schedule[day][i] = f"{subject.name} ({subject.section})"
+                    faculty.schedule[day][i+1] = f"{subject.name} ({subject.section})"
+                    faculty.units_allocated += UNIT_VALUE[subject.type] * 1
+                    return
 
     def get_teacher_for_subject(self, subject):
         for tid, faculty in self.faculties.items():
@@ -78,12 +99,11 @@ class TimetableGenerator:
                 return tid
         return None
 
-    def can_schedule(self, faculty, day, i, type):
-        if type == "Theory":
-            if i > 0 and faculty.schedule[day][i-1] is not None:
-                return False
-            if i < len(TIME_SLOTS)-1 and faculty.schedule[day][i+1] is not None:
-                return False
+    def can_schedule(self, faculty, day, i):
+        if i > 0 and faculty.schedule[day][i-1] is not None:
+            return False
+        if i < len(TIME_SLOTS)-1 and faculty.schedule[day][i+1] is not None:
+            return False
         return True
 
     def get_section_tt(self, section):
@@ -91,3 +111,7 @@ class TimetableGenerator:
 
     def get_faculty_tt(self, tid):
         return self.faculties[tid].schedule
+
+# Export constants for app.py
+__all__ = ["TimetableGenerator", "DAYS", "TIME_SLOTS"]
+
